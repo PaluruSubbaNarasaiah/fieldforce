@@ -46,10 +46,8 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, isMobileOpen
         <div className="flex flex-col h-full">
           <div className="p-6 border-b border-slate-700 flex items-center justify-between">
             <div className="flex items-center gap-2 font-bold text-xl tracking-tight">
-              <div className="w-8 h-8 bg-blue-500 rounded-lg flex items-center justify-center">
-                <MapPin className="text-white w-5 h-5" />
-              </div>
-              <span>FieldForce</span>
+              <img src="/Bdts.png" alt="BDTS Logo" className="w-8 h-8 object-contain" />
+              <span>BDTS</span>
             </div>
             <button onClick={() => setIsMobileOpen(false)} className="md:hidden">
               <LogOut className="w-5 h-5" />

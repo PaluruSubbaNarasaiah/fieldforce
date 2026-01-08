@@ -108,9 +108,9 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
       <div className="max-w-md w-full bg-white rounded-2xl shadow-2xl overflow-hidden z-10">
         <div className="bg-gradient-to-r from-blue-600 to-indigo-700 p-8 text-center text-white relative">
           <div className="w-16 h-16 bg-white/20 rounded-2xl flex items-center justify-center mx-auto mb-4 backdrop-blur-sm">
-            <MapPin className="w-8 h-8 text-white" />
+            <img src="/Bdts.png" alt="BDTS Logo" className="w-12 h-12 object-contain" />
           </div>
-          <h1 className="text-3xl font-bold mb-2">FieldForce Pro</h1>
+          <h1 className="text-3xl font-bold mb-2">BDTS Field Force Pro</h1>
           <p className="text-blue-100">Manage your workforce efficiently</p>
         </div>
 

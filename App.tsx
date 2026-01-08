@@ -104,7 +104,7 @@ const App: React.FC = () => {
             >
               <Menu className="w-5 h-5" />
             </button>
-            <h1 className="text-xl font-bold text-slate-800 sm:hidden">FieldForce</h1>
+            <h1 className="text-xl font-bold text-slate-800 sm:hidden">BDTS</h1>
             <div className="hidden sm:flex items-center gap-2 text-slate-400 bg-slate-100 px-3 py-1.5 rounded-lg border border-slate-200 w-64 focus-within:ring-2 focus-within:ring-blue-500/20 focus-within:border-blue-500 transition-all">
               <Search className="w-4 h-4" />
               <input 
