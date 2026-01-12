@@ -35,11 +35,30 @@ const PhotoProof: React.FC<PhotoProofProps> = ({ user }) => {
   useEffect(() => {
     startCamera();
     return () => {
-      if (stream) {
-        stream.getTracks().forEach(track => track.stop());
-      }
+      stopCamera();
     };
   }, [facingMode]);
+
+  // Cleanup function to stop camera
+  const stopCamera = () => {
+    if (stream) {
+      stream.getTracks().forEach(track => {
+        track.stop();
+        console.log('Camera track stopped:', track.kind);
+      });
+      setStream(null);
+    }
+    if (videoRef.current) {
+      videoRef.current.srcObject = null;
+    }
+  };
+
+  // Stop camera when component unmounts or user navigates away
+  useEffect(() => {
+    return () => {
+      stopCamera();
+    };
+  }, []);
 
   // 2. Watch Location, Orientation & Motion (Stabilization)
   useEffect(() => {
@@ -117,6 +136,9 @@ const PhotoProof: React.FC<PhotoProofProps> = ({ user }) => {
 
   const startCamera = async () => {
     try {
+      // Stop any existing stream first
+      stopCamera();
+      
       const mediaStream = await navigator.mediaDevices.getUserMedia({ 
         video: { facingMode: facingMode } 
       });

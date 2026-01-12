@@ -1,21 +1,10 @@
 /**
- * FIELD FORCE CRM BACKEND
- * 
- * --- SETUP INSTRUCTIONS ---
- * 1. Run 'setup' function once.
- * 2. Deploy as Web App:
- *    - Execute as: Me
- *    - Who has access: Anyone
- *    - IMPORTANT: Create a New Version when deploying!
+ * FIELD FORCE CRM BACKEND WITH BREAK TRACKING
  */
 
-// UPDATED IDs
 const SHEET_ID = '1KjrShfTTtd6OXD48tOgrn27_Vl6o9yoNb4_81wT-fM4';
 const ROOT_FOLDER_ID = '172IDItzd4x6B-gG6K-U5dBgKYKn6x0Op';
 
-/**
- * RUN THIS FUNCTION ONCE TO INITIALIZE YOUR SHEET
- */
 function setup() {
   const ss = SpreadsheetApp.openById(SHEET_ID);
   
@@ -47,6 +36,13 @@ function setup() {
                sheet.getRange(1, currentHeaders.length + 1, 1, missing.length).setValues([missing]);
             }
          }
+         if (sheetName === 'Attendance') {
+            const currentHeaders = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+            if (currentHeaders.length < headers.length) {
+               const missing = headers.slice(currentHeaders.length);
+               sheet.getRange(1, currentHeaders.length + 1, 1, missing.length).setValues([missing]);
+            }
+         }
       }
     }
 
@@ -65,10 +61,6 @@ function setup() {
       }
     }
   }
-}
-
-function getSpreadsheet() {
-  return SpreadsheetApp.openById(SHEET_ID);
 }
 
 function doGet(e) {
@@ -120,114 +112,9 @@ function doPost(e) {
   }
 }
 
-// --- Profile Image Upload ---
-function uploadProfileToDrive(payload) {
-  try {
-    const { imageData, userId, userName } = payload;
-    
-    if (!imageData || !userId) {
-       return response({ status: 'error', message: 'Missing image data or user ID' });
-    }
-
-    let rootFolder;
-    try {
-      rootFolder = DriveApp.getFolderById(ROOT_FOLDER_ID);
-    } catch(err) {
-      return response({ status: 'error', message: 'Invalid Root Folder ID: ' + ROOT_FOLDER_ID });
-    }
-
-    const profileFolder = getOrCreateFolder(rootFolder, 'Profiles');
-    const imageBytes = Utilities.base64Decode(imageData.split(',')[1]);
-    const fileName = `profile_${userId}_${Date.now()}.jpg`;
-    const blob = Utilities.newBlob(imageBytes, 'image/jpeg', fileName);
-    
-    const file = profileFolder.createFile(blob);
-    file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
-
-    const fileUrl = `https://drive.google.com/drive/folders/172IDItzd4x6B-gG6K-U5dBgKYKn6x0Op=${file.getId()}`;
-
-    // Update user avatar in Users sheet
-    const ss = getSpreadsheet();
-    const sheet = ss.getSheetByName('Users');
-    const data = sheet.getDataRange().getValues();
-    const headers = data[0].map(h => String(h).toLowerCase());
-    
-    const idIndex = headers.indexOf('id');
-    const avatarIndex = headers.indexOf('avatar');
-
-    for (let i = 1; i < data.length; i++) {
-      if (String(data[i][idIndex]) === String(userId)) {
-        sheet.getRange(i + 1, avatarIndex + 1).setValue(fileUrl);
-        break;
-      }
-    }
-
-    return response({ status: 'success', message: 'Profile updated', data: { avatar: fileUrl } });
-
-  } catch (e) {
-    return response({ status: 'error', message: 'Upload Failed: ' + getErrorMessage(e) });
-  }
-}
-
-// --- Enhanced Location Update with Online Status ---
-function updateLocation(payload) {
-  const { userId, lat, lng, timestamp } = payload;
-  const ss = getSpreadsheet();
-  const sheet = ss.getSheetByName('Users');
-  if (!sheet) return response({ status: 'error', message: 'Users sheet not found' });
-
-  const data = sheet.getDataRange().getValues();
-  const headers = data[0].map(h => String(h).toLowerCase());
-  
-  const idIndex = headers.indexOf('id');
-  const latIndex = headers.indexOf('lastlat');
-  const lngIndex = headers.indexOf('lastlng');
-  const pingIndex = headers.indexOf('lastping');
-  const onlineIndex = headers.indexOf('isonline');
-
-  if (idIndex === -1 || latIndex === -1) return response({ status: 'error', message: 'Schema mismatch' });
-
-  for (let i = 1; i < data.length; i++) {
-    if (String(data[i][idIndex]) === String(userId)) {
-      sheet.getRange(i + 1, latIndex + 1).setValue(lat);
-      sheet.getRange(i + 1, lngIndex + 1).setValue(lng);
-      sheet.getRange(i + 1, pingIndex + 1).setValue(timestamp);
-      if (onlineIndex !== -1) {
-        sheet.getRange(i + 1, onlineIndex + 1).setValue('true');
-      }
-      return response({ status: 'success', message: 'Location updated' });
-    }
-  }
-
-  return response({ status: 'error', message: 'User not found' });
-}
-
-// --- Enhanced Attendance with Total Hours Calculation ---
-function createData(sheetName, payload) {
-  const ss = getSpreadsheet();
-  const sheet = ss.getSheetByName(sheetName);
-  if (!sheet) return response({ status: 'error', message: 'Sheet not found: ' + sheetName });
-
-  // Special handling for attendance
-  if (sheetName === 'Attendance') {
-    // Update user online status
-    updateUserOnlineStatus(payload.userId, true);
-  }
-
-  const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
-  const newRow = headers.map(header => {
-    if (header.toLowerCase() === 'id') return String(payload[header.toLowerCase()] || payload[header]);
-    const key = Object.keys(payload).find(k => k.toLowerCase() === header.toLowerCase());
-    return key ? payload[key] : '';
-  });
-
-  sheet.appendRow(newRow);
-  return response({ status: 'success', message: 'Created', data: payload });
-}
-
 function updateData(sheetName, payload) {
   try {
-    const ss = getSpreadsheet();
+    const ss = SpreadsheetApp.openById(SHEET_ID);
     const sheet = ss.getSheetByName(sheetName);
     if (!sheet) return response({ status: 'error', message: 'Sheet not found: ' + sheetName });
 
@@ -272,6 +159,21 @@ function updateData(sheetName, payload) {
       }
     }
 
+    // Calculate break hours if both break times are present
+    if (sheetName === 'Attendance' && payload.breakOutTime) {
+      const breakInTimeIndex = headers.indexOf('breakintime');
+      const breakHoursIndex = headers.indexOf('breakhours');
+      
+      if (breakInTimeIndex !== -1 && breakHoursIndex !== -1) {
+        const breakInTime = data[rowIndex - 1][breakInTimeIndex];
+        if (breakInTime) {
+          const breakHours = calculateTotalHours(breakInTime, payload.breakOutTime);
+          payload.breakHours = breakHours;
+          console.log(`Calculated break hours: ${breakInTime} to ${payload.breakOutTime} = ${breakHours}`);
+        }
+      }
+    }
+
     headers.forEach((header, colIndex) => {
       const key = Object.keys(payload).find(k => k.toLowerCase() === header);
       if (key && payload[key] !== undefined) {
@@ -288,11 +190,9 @@ function updateData(sheetName, payload) {
 
 function calculateTotalHours(inTime, outTime) {
   try {
-    // Parse time strings (e.g., "09:30" or "9:30 AM")
     const parseTime = (timeStr) => {
       if (!timeStr) return null;
       
-      // Handle AM/PM format
       let cleanTime = timeStr.toString().trim();
       let hours, minutes;
       
@@ -303,13 +203,12 @@ function calculateTotalHours(inTime, outTime) {
         hours = isPM && h !== 12 ? h + 12 : (h === 12 && !isPM ? 0 : h);
         minutes = m || 0;
       } else {
-        // 24-hour format
         const [h, m] = cleanTime.split(':').map(Number);
         hours = h;
         minutes = m || 0;
       }
       
-      return hours * 60 + minutes; // Return total minutes
+      return hours * 60 + minutes;
     };
     
     const inMinutes = parseTime(inTime);
@@ -318,7 +217,7 @@ function calculateTotalHours(inTime, outTime) {
     if (inMinutes === null || outMinutes === null) return '0h 0m';
     
     let diffMinutes = outMinutes - inMinutes;
-    if (diffMinutes < 0) diffMinutes += 24 * 60; // Handle next day
+    if (diffMinutes < 0) diffMinutes += 24 * 60;
     
     const hours = Math.floor(diffMinutes / 60);
     const minutes = diffMinutes % 60;
@@ -330,9 +229,29 @@ function calculateTotalHours(inTime, outTime) {
   }
 }
 
+function createData(sheetName, payload) {
+  const ss = SpreadsheetApp.openById(SHEET_ID);
+  const sheet = ss.getSheetByName(sheetName);
+  if (!sheet) return response({ status: 'error', message: 'Sheet not found: ' + sheetName });
+
+  if (sheetName === 'Attendance') {
+    updateUserOnlineStatus(payload.userId, true);
+  }
+
+  const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+  const newRow = headers.map(header => {
+    if (header.toLowerCase() === 'id') return String(payload[header.toLowerCase()] || payload[header]);
+    const key = Object.keys(payload).find(k => k.toLowerCase() === header.toLowerCase());
+    return key ? payload[key] : '';
+  });
+
+  sheet.appendRow(newRow);
+  return response({ status: 'success', message: 'Created', data: payload });
+}
+
 function updateUserOnlineStatus(userId, isOnline) {
   try {
-    const ss = getSpreadsheet();
+    const ss = SpreadsheetApp.openById(SHEET_ID);
     const sheet = ss.getSheetByName('Users');
     const data = sheet.getDataRange().getValues();
     const headers = data[0].map(h => String(h).toLowerCase());
@@ -353,7 +272,85 @@ function updateUserOnlineStatus(userId, isOnline) {
   }
 }
 
-// --- Drive Integration ---
+function uploadProfileToDrive(payload) {
+  try {
+    const { imageData, userId, userName } = payload;
+    
+    if (!imageData || !userId) {
+       return response({ status: 'error', message: 'Missing image data or user ID' });
+    }
+
+    let rootFolder;
+    try {
+      rootFolder = DriveApp.getFolderById(ROOT_FOLDER_ID);
+    } catch(err) {
+      return response({ status: 'error', message: 'Invalid Root Folder ID: ' + ROOT_FOLDER_ID });
+    }
+
+    const profileFolder = getOrCreateFolder(rootFolder, 'Profiles');
+    const imageBytes = Utilities.base64Decode(imageData.split(',')[1]);
+    const fileName = `profile_${userId}_${Date.now()}.jpg`;
+    const blob = Utilities.newBlob(imageBytes, 'image/jpeg', fileName);
+    
+    const file = profileFolder.createFile(blob);
+    file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+
+    const fileUrl = `https://drive.google.com/uc?id=${file.getId()}`;
+
+    const ss = SpreadsheetApp.openById(SHEET_ID);
+    const sheet = ss.getSheetByName('Users');
+    const data = sheet.getDataRange().getValues();
+    const headers = data[0].map(h => String(h).toLowerCase());
+    
+    const idIndex = headers.indexOf('id');
+    const avatarIndex = headers.indexOf('avatar');
+
+    for (let i = 1; i < data.length; i++) {
+      if (String(data[i][idIndex]) === String(userId)) {
+        sheet.getRange(i + 1, avatarIndex + 1).setValue(fileUrl);
+        break;
+      }
+    }
+
+    return response({ status: 'success', message: 'Profile updated', data: { avatar: fileUrl } });
+
+  } catch (e) {
+    return response({ status: 'error', message: 'Upload Failed: ' + getErrorMessage(e) });
+  }
+}
+
+function updateLocation(payload) {
+  const { userId, lat, lng, timestamp } = payload;
+  const ss = SpreadsheetApp.openById(SHEET_ID);
+  const sheet = ss.getSheetByName('Users');
+  if (!sheet) return response({ status: 'error', message: 'Users sheet not found' });
+
+  const data = sheet.getDataRange().getValues();
+  const headers = data[0].map(h => String(h).toLowerCase());
+  
+  const idIndex = headers.indexOf('id');
+  const latIndex = headers.indexOf('lastlat');
+  const lngIndex = headers.indexOf('lastlng');
+  const pingIndex = headers.indexOf('lastping');
+  const onlineIndex = headers.indexOf('isonline');
+
+  if (idIndex === -1 || latIndex === -1) return response({ status: 'error', message: 'Schema mismatch' });
+
+  for (let i = 1; i < data.length; i++) {
+    if (String(data[i][idIndex]) === String(userId)) {
+      sheet.getRange(i + 1, latIndex + 1).setValue(lat);
+      sheet.getRange(i + 1, lngIndex + 1).setValue(lng);
+      sheet.getRange(i + 1, pingIndex + 1).setValue(timestamp);
+      if (onlineIndex !== -1) {
+        sheet.getRange(i + 1, onlineIndex + 1).setValue('true');
+      }
+      return response({ status: 'success', message: 'Location updated' });
+    }
+  }
+
+  return response({ status: 'error', message: 'User not found' });
+}
+
 function getOrCreateFolder(parent, name) {
   const folders = parent.getFoldersByName(name);
   if (folders.hasNext()) {
@@ -404,7 +401,7 @@ function uploadPhotoToDrive(payload) {
     file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
 
     const driveId = file.getId();
-    const fileUrl = `https://drive.google.com/drive/folders/172IDItzd4x6B-gG6K-U5dBgKYKn6x0Op=${driveId}`;
+    const fileUrl = `https://drive.google.com/uc?id=${driveId}`;
 
     const sheetPayload = {
       ...metadata,
@@ -413,7 +410,7 @@ function uploadPhotoToDrive(payload) {
       driveFileId: driveId
     };
 
-    const ss = getSpreadsheet();
+    const ss = SpreadsheetApp.openById(SHEET_ID);
     let sheet = ss.getSheetByName('Photos');
     if (!sheet) {
         sheet = ss.insertSheet('Photos');
@@ -436,9 +433,8 @@ function uploadPhotoToDrive(payload) {
   }
 }
 
-// --- CRUD Operations ---
 function readData(sheetName) {
-  const ss = getSpreadsheet();
+  const ss = SpreadsheetApp.openById(SHEET_ID);
   const sheet = ss.getSheetByName(sheetName);
   if (!sheet) return response([]);
 
@@ -463,7 +459,7 @@ function readData(sheetName) {
 }
 
 function deleteData(sheetName, payload) {
-  const ss = getSpreadsheet();
+  const ss = SpreadsheetApp.openById(SHEET_ID);
   const sheet = ss.getSheetByName(sheetName);
   if (!sheet) return response({ status: 'error', message: 'Sheet not found' });
 

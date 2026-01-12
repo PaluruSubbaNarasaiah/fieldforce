@@ -8,14 +8,15 @@ interface AttendanceProps {
 }
 
 const Attendance: React.FC<AttendanceProps> = ({ user }) => {
-  const [status, setStatus] = useState<'Checked In' | 'Checked Out' | 'Loading'>('Loading');
+  const [status, setStatus] = useState<'Checked In' | 'Checked Out' | 'On Break'>('Checked Out');
+  const [breakStatus, setBreakStatus] = useState<'Break In' | 'Break Out'>('Break Out');
+  const [currentBreakId, setCurrentBreakId] = useState<string | null>(null);
   const [location, setLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [loadingAction, setLoadingAction] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [history, setHistory] = useState<any[]>([]);
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
 
-  // Helper: Get local YYYY-MM-DD string to ensure consistency across Timezones
   const getTodayDateString = () => {
     const now = new Date();
     const year = now.getFullYear();
@@ -25,33 +26,16 @@ const Attendance: React.FC<AttendanceProps> = ({ user }) => {
   };
 
   useEffect(() => {
-    getCurrentLocation();
-    loadHistory();
-    
-    // Listen for storage changes to sync status across components
-    const handleStorageChange = () => {
-      loadHistory();
-    };
-    window.addEventListener('storage', handleStorageChange);
-    
-    return () => {
-      window.removeEventListener('storage', handleStorageChange);
-    };
+    // Do nothing - no auto loading or syncing
   }, [user]);
 
   const loadHistory = async () => {
     try {
         const data = await api.fetch('Attendance');
-        
-        // Filter history for current user
         let userHistory = data.filter((item: any) => String(item.userId) === String(user.id));
-        
-        // Sort by ID descending so we look at latest first
         userHistory = userHistory.sort((a: any, b: any) => Number(b.id) - Number(a.id)); 
-
         const todayStr = getTodayDateString();
         
-        // Find the LATEST record for today
         const activeSession = userHistory.find((item: any) => {
             const isToday = item.date === todayStr || (item.date && item.date.startsWith(todayStr));
             return isToday && item.inTime && (!item.outTime || item.outTime === '');
@@ -60,41 +44,16 @@ const Attendance: React.FC<AttendanceProps> = ({ user }) => {
         if (activeSession) {
             setStatus('Checked In');
             setCurrentSessionId(activeSession.id);
-            // Update localStorage to match API data
-            localStorage.setItem('attendanceStatus', JSON.stringify({
-              status: 'Checked In',
-              sessionId: activeSession.id,
-              userId: user.id,
-              timestamp: Date.now()
-            }));
         } else {
             setStatus('Checked Out');
             setCurrentSessionId(null);
-            // Update localStorage to match API data
-            localStorage.setItem('attendanceStatus', JSON.stringify({
-              status: 'Checked Out',
-              sessionId: null,
-              userId: user.id,
-              timestamp: Date.now()
-            }));
         }
 
         setHistory(userHistory); 
     } catch (e) {
         console.error("Failed to load history", e);
         setError("Could not sync attendance status.");
-        
-        // Check localStorage as fallback
-        const storedStatus = localStorage.getItem('attendanceStatus');
-        if (storedStatus) {
-          const parsed = JSON.parse(storedStatus);
-          if (parsed.userId === user.id) {
-            setStatus(parsed.status);
-            setCurrentSessionId(parsed.sessionId);
-          }
-        } else {
-          setStatus('Checked Out');
-        }
+        setStatus('Checked Out');
     }
   };
 
@@ -130,7 +89,7 @@ const Attendance: React.FC<AttendanceProps> = ({ user }) => {
 
   const handleToggle = async () => {
     if (!location) {
-      getCurrentLocation();
+      setError('Please get your location first by clicking the GPS refresh button.');
       return;
     }
     
@@ -145,7 +104,6 @@ const Attendance: React.FC<AttendanceProps> = ({ user }) => {
     
     try {
         if (status === 'Checked Out') {
-            // --- PUNCH IN ---
             const newId = Date.now().toString(); 
             const newSession = {
                 id: newId,
@@ -158,25 +116,14 @@ const Attendance: React.FC<AttendanceProps> = ({ user }) => {
                 totalHours: ''
             };
             
-            // Optimistic Update
             setStatus('Checked In'); 
             setCurrentSessionId(newId);
             setHistory(prev => [newSession, ...prev]);
-            
-            // Store status in localStorage for persistence
-            localStorage.setItem('attendanceStatus', JSON.stringify({
-              status: 'Checked In',
-              sessionId: newId,
-              userId: user.id,
-              timestamp: Date.now()
-            }));
 
-            // API Call
             const result = await api.create('Attendance', newSession);
             console.log('Punch In Result:', result);
             
             if (result.status !== 'success') {
-              // Revert optimistic update on failure
               setStatus('Checked Out');
               setCurrentSessionId(null);
               setHistory(prev => prev.filter(h => h.id !== newId));
@@ -184,10 +131,8 @@ const Attendance: React.FC<AttendanceProps> = ({ user }) => {
             }
             
         } else {
-            // --- PUNCH OUT ---
             let targetId = currentSessionId;
 
-            // Fallback: Find open session in local history if ID is lost
             if (!targetId) {
                 const active = history.find(h => !h.outTime && (h.date === dateString || h.date.startsWith(dateString)));
                 if (active) targetId = active.id;
@@ -199,36 +144,22 @@ const Attendance: React.FC<AttendanceProps> = ({ user }) => {
                     outTime: timeString
                 };
                 
-                // Optimistic Update
                 setStatus('Checked Out');
                 setHistory(prev => prev.map(h => 
                     h.id === targetId ? { ...h, outTime: timeString } : h
                 ));
                 setCurrentSessionId(null);
-                
-                // Update localStorage
-                localStorage.setItem('attendanceStatus', JSON.stringify({
-                  status: 'Checked Out',
-                  sessionId: null,
-                  userId: user.id,
-                  timestamp: Date.now()
-                }));
 
-                // API Call
                 const result = await api.update('Attendance', updatePayload);
                 console.log('Punch Out Result:', result);
                 
                 if (result.status !== 'success') {
-                  // Revert optimistic update on failure
                   setStatus('Checked In');
                   setCurrentSessionId(targetId);
                   setHistory(prev => prev.map(h => 
                       h.id === targetId ? { ...h, outTime: '' } : h
                   ));
                   setError('Failed to punch out. Please try again.');
-                } else {
-                  // Reload history to get updated total hours only on success
-                  setTimeout(() => loadHistory(), 1000);
                 }
             } else {
                  setError("Active session not found. Please refresh.");
@@ -243,6 +174,53 @@ const Attendance: React.FC<AttendanceProps> = ({ user }) => {
     }
   };
 
+  const handleBreakToggle = async () => {
+    if (!location) {
+      setError('Please get your location first by clicking the GPS refresh button.');
+      return;
+    }
+    
+    setLoadingAction(true);
+    const now = new Date();
+    const timeString = now.toLocaleTimeString('en-US', { 
+      hour12: false, 
+      hour: '2-digit', 
+      minute: '2-digit' 
+    });
+    
+    try {
+        if (status === 'Checked In') {
+            const updatePayload = {
+                id: currentSessionId,
+                breakInTime: timeString
+            };
+            
+            setStatus('On Break');
+            setBreakStatus('Break In');
+            
+            const result = await api.update('Attendance', updatePayload);
+            console.log('Break In Result:', result);
+            
+        } else if (status === 'On Break') {
+            const updatePayload = {
+                id: currentSessionId,
+                breakOutTime: timeString
+            };
+            
+            setStatus('Checked In');
+            setBreakStatus('Break Out');
+            
+            const result = await api.update('Attendance', updatePayload);
+            console.log('Break Out Result:', result);
+        }
+    } catch (err) {
+        console.error('Break Error:', err);
+        setError("Network error during break operation.");
+    } finally {
+        setLoadingAction(false);
+    }
+  };
+
   return (
     <div className="max-w-4xl mx-auto space-y-6 pb-20 animate-fade-in">
       <div className="bg-white rounded-xl shadow-sm border border-slate-100 p-8">
@@ -252,44 +230,66 @@ const Attendance: React.FC<AttendanceProps> = ({ user }) => {
                 <h2 className="text-2xl font-bold text-slate-900 text-left">Geo-Attendance</h2>
                 <p className="text-slate-500 text-sm text-left">Mark your daily attendance with GPS.</p>
              </div>
-             <button onClick={getCurrentLocation} className="p-2 bg-slate-100 rounded-full hover:bg-slate-200 transition-colors" title="Refresh GPS">
-                <RefreshCw className={`w-4 h-4 text-slate-600 ${loadingAction && !status ? 'animate-spin' : ''}`} />
+             <button onClick={getCurrentLocation} className="p-2 bg-slate-100 rounded-full hover:bg-slate-200 transition-colors" title="Get GPS Location">
+                <RefreshCw className={`w-4 h-4 text-slate-600 ${loadingAction ? 'animate-spin' : ''}`} />
              </button>
           </div>
           
-          <div className="flex justify-center py-8">
-            {status === 'Loading' ? (
-                 <div className="w-56 h-56 rounded-full flex flex-col items-center justify-center bg-slate-50 border-4 border-slate-100">
-                    <Loader2 className="w-10 h-10 text-slate-400 animate-spin mb-2" />
-                    <span className="text-slate-500 text-sm">Syncing Status...</span>
-                 </div>
+          <div className="flex justify-center gap-4 py-8">
+            <button
+            onClick={handleToggle}
+            disabled={loadingAction || !location || status === 'On Break'}
+            className={`
+                relative w-40 h-40 rounded-full flex flex-col items-center justify-center gap-2 transition-all transform hover:scale-105 shadow-2xl disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none
+                ${status === 'Checked In' 
+                ? 'bg-gradient-to-br from-red-500 to-red-600 ring-8 ring-red-100 shadow-red-200' 
+                : 'bg-gradient-to-br from-green-500 to-emerald-600 ring-8 ring-green-100 shadow-green-200'}
+            `}
+            >
+            {loadingAction ? (
+                <div className="flex flex-col items-center">
+                    <Loader2 className="animate-spin h-8 w-8 text-white mb-2" />
+                    <span className="text-white text-xs font-medium">Updating...</span>
+                </div>
             ) : (
-                <button
-                onClick={handleToggle}
-                disabled={loadingAction || !location}
-                className={`
-                    relative w-56 h-56 rounded-full flex flex-col items-center justify-center gap-2 transition-all transform hover:scale-105 shadow-2xl disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none
-                    ${status === 'Checked In' 
-                    ? 'bg-gradient-to-br from-red-500 to-red-600 ring-8 ring-red-100 shadow-red-200' 
-                    : 'bg-gradient-to-br from-green-500 to-emerald-600 ring-8 ring-green-100 shadow-green-200'}
-                `}
-                >
-                {loadingAction ? (
-                    <div className="flex flex-col items-center">
-                        <Loader2 className="animate-spin h-10 w-10 text-white mb-2" />
-                        <span className="text-white text-xs font-medium">Updating...</span>
-                    </div>
-                ) : (
-                    <>
-                    <div className="text-white text-6xl font-black tracking-wider drop-shadow-md">
-                        {status === 'Checked In' ? 'OUT' : 'IN'}
-                    </div>
-                    <span className="text-white/90 text-sm font-bold uppercase tracking-wider bg-black/10 px-3 py-1 rounded-full">
-                        {status === 'Checked In' ? 'Punch Out' : 'Punch In'}
-                    </span>
-                    </>
-                )}
-                </button>
+                <>
+                <div className="text-white text-4xl font-black tracking-wider drop-shadow-md">
+                    {status === 'Checked In' ? 'OUT' : 'IN'}
+                </div>
+                <span className="text-white/90 text-xs font-bold uppercase tracking-wider bg-black/10 px-2 py-1 rounded-full">
+                    {status === 'Checked In' ? 'Punch Out' : 'Punch In'}
+                </span>
+                </>
+            )}
+            </button>
+
+            {(status === 'Checked In' || status === 'On Break') && (
+              <button
+              onClick={handleBreakToggle}
+              disabled={loadingAction || !location}
+              className={`
+                  relative w-40 h-40 rounded-full flex flex-col items-center justify-center gap-2 transition-all transform hover:scale-105 shadow-2xl disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none
+                  ${status === 'On Break' 
+                  ? 'bg-gradient-to-br from-blue-500 to-blue-600 ring-8 ring-blue-100 shadow-blue-200' 
+                  : 'bg-gradient-to-br from-orange-500 to-orange-600 ring-8 ring-orange-100 shadow-orange-200'}
+              `}
+              >
+              {loadingAction ? (
+                  <div className="flex flex-col items-center">
+                      <Loader2 className="animate-spin h-8 w-8 text-white mb-2" />
+                      <span className="text-white text-xs font-medium">Updating...</span>
+                  </div>
+              ) : (
+                  <>
+                  <div className="text-white text-3xl font-black tracking-wider drop-shadow-md">
+                      {status === 'On Break' ? 'BACK' : 'BREAK'}
+                  </div>
+                  <span className="text-white/90 text-xs font-bold uppercase tracking-wider bg-black/10 px-2 py-1 rounded-full">
+                      {status === 'On Break' ? 'Break Out' : 'Break In'}
+                  </span>
+                  </>
+              )}
+              </button>
             )}
           </div>
 
@@ -336,8 +336,14 @@ const Attendance: React.FC<AttendanceProps> = ({ user }) => {
              </div>
              <div className="text-center p-3 rounded-lg bg-slate-50">
                 <p className="text-xs text-slate-500 uppercase font-semibold mb-1">Status</p>
-                <p className={`text-lg font-bold ${status === 'Checked In' ? 'text-green-600' : 'text-slate-400'}`}>
-                    {status === 'Checked In' ? 'ONLINE' : status === 'Loading' ? '...' : 'OFFLINE'}
+                <p className={`text-lg font-bold ${
+                    status === 'Checked In' ? 'text-green-600' : 
+                    status === 'On Break' ? 'text-orange-600' : 
+                    'text-slate-400'
+                }`}>
+                    {status === 'Checked In' ? 'ONLINE' : 
+                     status === 'On Break' ? 'ON BREAK' : 
+                     'OFFLINE'}
                 </p>
              </div>
           </div>
@@ -349,35 +355,32 @@ const Attendance: React.FC<AttendanceProps> = ({ user }) => {
            <h3 className="font-semibold text-slate-800 flex items-center gap-2">
              <Clock className="w-4 h-4" /> Recent Activity
            </h3>
-           <button onClick={loadHistory} className="text-blue-600 hover:text-blue-700 text-sm font-medium">Refresh</button>
+           <button onClick={() => { setError(null); loadHistory(); }} className="text-blue-600 hover:text-blue-700 text-sm font-medium">Manual Refresh</button>
         </div>
         <div className="overflow-x-auto">
-          {status === 'Loading' ? (
-              <div className="flex justify-center py-8"><Loader2 className="w-6 h-6 animate-spin text-blue-600"/></div>
-          ) : (
           <table className="w-full text-left text-sm text-slate-600">
             <thead className="bg-slate-50 text-xs uppercase font-semibold text-slate-500">
               <tr>
                 <th className="px-6 py-3">Date</th>
                 <th className="px-6 py-3">In</th>
                 <th className="px-6 py-3">Out</th>
+                <th className="px-6 py-3">Break In</th>
+                <th className="px-6 py-3">Break Out</th>
                 <th className="px-6 py-3">Hours</th>
-                <th className="px-6 py-3">Location</th>
                 <th className="px-6 py-3">Status</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {history.length === 0 ? (
-                  <tr><td colSpan={6} className="text-center py-4">No history found.</td></tr>
+                  <tr><td colSpan={7} className="text-center py-4">No history found.</td></tr>
               ) : history.slice(0, 10).map((record, idx) => (
                 <tr key={record.id || idx} className="hover:bg-slate-50 transition-colors">
                   <td className="px-6 py-4 font-medium text-slate-900">{record.date}</td>
                   <td className="px-6 py-4 text-green-600 font-medium">{record.inTime}</td>
                   <td className="px-6 py-4 text-red-600 font-medium">{record.outTime || '--:--'}</td>
-                  <td className="px-6 py-4 text-blue-600 font-medium">{record.totalHours || (record.outTime ? 'Calculating...' : '--')}</td>
-                  <td className="px-6 py-4 flex items-center gap-1 font-mono text-xs truncate max-w-[150px]" title={record.location}>
-                    <MapPin className="w-3 h-3 text-slate-400" /> {record.location}
-                  </td>
+                  <td className="px-6 py-4 text-orange-600 font-medium">{record.breakInTime || '--:--'}</td>
+                  <td className="px-6 py-4 text-blue-600 font-medium">{record.breakOutTime || '--:--'}</td>
+                  <td className="px-6 py-4 text-blue-600 font-medium">{record.totalHours || '--'}</td>
                   <td className="px-6 py-4">
                     <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
                       <Check className="w-3 h-3" /> {record.status}
@@ -387,7 +390,6 @@ const Attendance: React.FC<AttendanceProps> = ({ user }) => {
               ))}
             </tbody>
           </table>
-          )}
         </div>
       </div>
     </div>
