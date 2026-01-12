@@ -15,8 +15,6 @@ import Expenses from './components/Expenses';
 import PhotoProof from './components/PhotoProof';
 import PhotoGallery from './components/PhotoGallery';
 import Settings from './components/Settings';
-import Notifications from './components/Notifications';
-import GPSNavigation from './components/GPSNavigation';
 import { User } from './types';
 import { MENU_ITEMS } from './constants';
 
@@ -24,7 +22,6 @@ const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const [user, setUser] = useState<User | null>(null);
-  const [showNotifications, setShowNotifications] = useState(false);
 
   const handleLogin = (loggedInUser: User) => {
     setUser(loggedInUser);
@@ -81,7 +78,7 @@ const App: React.FC = () => {
       case 'orders': return <Orders />;
       case 'expenses': return <Expenses user={user} />;
       case 'tracking': return <MapTracker />;
-      case 'navigation': return <GPSNavigation user={user} />;
+      case 'navigation': return <div className="p-8 text-center"><p>GPS Navigation coming soon</p></div>;
       case 'proof': return <PhotoProof user={user} />;
       case 'gallery': return <PhotoGallery />;
       case 'settings': return <Settings user={user} />;
@@ -122,20 +119,13 @@ const App: React.FC = () => {
           </div>
 
           <div className="flex items-center gap-3">
-            <div className="relative">
-              <button 
-                onClick={() => setShowNotifications(!showNotifications)}
-                className="relative p-2 text-slate-500 hover:bg-slate-100 rounded-full transition-colors"
-              >
-                <Bell className="w-5 h-5" />
-                <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full border border-white"></span>
-              </button>
-              <Notifications 
-                user={user} 
-                isOpen={showNotifications} 
-                onClose={() => setShowNotifications(false)} 
-              />
-            </div>
+            <button 
+              onClick={() => alert('No new notifications')}
+              className="relative p-2 text-slate-500 hover:bg-slate-100 rounded-full transition-colors"
+            >
+              <Bell className="w-5 h-5" />
+              <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full border border-white"></span>
+            </button>
             <div className="hidden sm:flex items-center gap-2 pl-2 border-l border-slate-200">
               <div className="w-8 h-8 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center font-bold text-sm border border-blue-200 overflow-hidden">
                 <img src={user.avatar} alt="Avatar" className="w-full h-full object-cover" />

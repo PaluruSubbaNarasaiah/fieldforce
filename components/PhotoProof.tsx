@@ -24,6 +24,7 @@ const PhotoProof: React.FC<PhotoProofProps> = ({ user }) => {
   const [compass, setCompass] = useState<number>(0);
   const [pendingUploads, setPendingUploads] = useState<any[]>([]);
   const [flash, setFlash] = useState(false);
+  const [facingMode, setFacingMode] = useState<'user' | 'environment'>('environment');
   
   // Stabilization States
   const [stability, setStability] = useState<number>(0);
@@ -38,7 +39,7 @@ const PhotoProof: React.FC<PhotoProofProps> = ({ user }) => {
         stream.getTracks().forEach(track => track.stop());
       }
     };
-  }, []);
+  }, [facingMode]);
 
   // 2. Watch Location, Orientation & Motion (Stabilization)
   useEffect(() => {
@@ -47,23 +48,32 @@ const PhotoProof: React.FC<PhotoProofProps> = ({ user }) => {
         return;
     }
 
-    const watchId = navigator.geolocation.watchPosition(
-      (pos) => {
-        setGeoData(pos.coords);
-        setLocationError(null); // Clear error on success
-        fetchAddress(pos.coords.latitude, pos.coords.longitude);
-        fetchWeather(pos.coords.latitude, pos.coords.longitude);
-      },
-      (err) => {
-        console.error(err);
-        let msg = "GPS Signal Lost";
-        if (err.code === 1) msg = "Location Access Denied. Please enable permissions.";
-        else if (err.code === 2) msg = "GPS Unavailable. Check device settings.";
-        else if (err.code === 3) msg = "GPS Timeout. Searching...";
-        setLocationError(msg);
-      },
-      { enableHighAccuracy: true, maximumAge: 10000, timeout: 10000 }
-    );
+    let watchId: number;
+    
+    const startLocationWatch = () => {
+      watchId = navigator.geolocation.watchPosition(
+        (pos) => {
+          setGeoData(pos.coords);
+          setLocationError(null);
+          fetchAddress(pos.coords.latitude, pos.coords.longitude);
+          fetchWeather(pos.coords.latitude, pos.coords.longitude);
+        },
+        (err) => {
+          console.warn('GPS Error:', err);
+          let msg = "GPS Signal Lost";
+          if (err.code === 1) msg = "Location Access Denied. Please enable permissions.";
+          else if (err.code === 2) msg = "GPS Unavailable. Check device settings.";
+          else if (err.code === 3) {
+            msg = "GPS Timeout. Retrying...";
+            setTimeout(startLocationWatch, 2000);
+          }
+          setLocationError(msg);
+        },
+        { enableHighAccuracy: false, maximumAge: 300000, timeout: 30000 }
+      );
+    };
+
+    startLocationWatch();
 
     // Device Orientation for Compass
     const handleOrientation = (event: DeviceOrientationEvent) => {
@@ -91,7 +101,7 @@ const PhotoProof: React.FC<PhotoProofProps> = ({ user }) => {
     window.addEventListener('devicemotion', handleMotion);
 
     return () => {
-      navigator.geolocation.clearWatch(watchId);
+      if (watchId) navigator.geolocation.clearWatch(watchId);
       window.removeEventListener('deviceorientation', handleOrientation);
       window.removeEventListener('devicemotion', handleMotion);
     };
@@ -108,7 +118,7 @@ const PhotoProof: React.FC<PhotoProofProps> = ({ user }) => {
   const startCamera = async () => {
     try {
       const mediaStream = await navigator.mediaDevices.getUserMedia({ 
-        video: { facingMode: 'environment' } 
+        video: { facingMode: facingMode } 
       });
       setStream(mediaStream);
       if (videoRef.current) {
@@ -148,8 +158,12 @@ const PhotoProof: React.FC<PhotoProofProps> = ({ user }) => {
 
   const fetchAddress = async (lat: number, lng: number) => {
     try {
-        // Simple reverse geocoding via OpenStreetMap (Free, requires attribution)
-        const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`);
+        const controller = new AbortController();
+        setTimeout(() => controller.abort(), 5000);
+        
+        const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`, {
+          signal: controller.signal
+        });
         const data = await res.json();
         if (data && data.display_name) {
             setAddress(data.display_name);
@@ -160,9 +174,14 @@ const PhotoProof: React.FC<PhotoProofProps> = ({ user }) => {
   };
 
   const fetchWeather = async (lat: number, lng: number) => {
-      if (weather) return; // Don't spam
+      if (weather) return;
       try {
-        const res = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lng}&current_weather=true`);
+        const controller = new AbortController();
+        setTimeout(() => controller.abort(), 5000);
+        
+        const res = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lng}&current_weather=true`, {
+          signal: controller.signal
+        });
         const data = await res.json();
         if (data.current_weather) {
             setWeather(`${data.current_weather.temperature}°C`);
@@ -353,6 +372,10 @@ const PhotoProof: React.FC<PhotoProofProps> = ({ user }) => {
     // Save final image
     const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
     setCapturedImage(dataUrl);
+  };
+
+  const switchCamera = () => {
+    setFacingMode(prev => prev === 'environment' ? 'user' : 'environment');
   };
 
   const getCompassDirection = (degree: number) => {
@@ -614,6 +637,13 @@ const PhotoProof: React.FC<PhotoProofProps> = ({ user }) => {
 
                 {/* Controls */}
                 <div className="absolute bottom-8 left-0 right-0 flex justify-center items-center gap-6 z-10 pointer-events-auto">
+                     <button 
+                       onClick={switchCamera}
+                       className="w-12 h-12 rounded-full bg-black/50 border-2 border-white flex items-center justify-center shadow-lg hover:bg-black/70 transition-colors"
+                     >
+                        <RefreshCw className="w-5 h-5 text-white" />
+                     </button>
+                     
                      <button 
                        onClick={() => capturePhoto()}
                        disabled={!geoData || stabilizing}

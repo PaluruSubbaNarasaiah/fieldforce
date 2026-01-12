@@ -87,7 +87,7 @@ const RevenueChart = () => (
        <span className="text-xs text-green-600 bg-green-50 px-2 py-1 rounded-full font-medium">+12.5% vs last week</span>
     </div>
     <div className="h-72 w-full">
-      <ResponsiveContainer width="100%" height="100%">
+      <ResponsiveContainer width="100%" height="100%" minWidth={300} minHeight={200}>
          <AreaChart data={visitTrendData}>
             <defs>
               <linearGradient id="colorVisits" x1="0" y1="0" x2="0" y2="1">
@@ -110,7 +110,7 @@ const LeadPipelineChart = () => (
   <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100 h-full">
     <h3 className="font-semibold text-slate-800 mb-6">Lead Pipeline</h3>
     <div className="h-72 w-full flex items-center justify-center">
-      <ResponsiveContainer width="100%" height="100%">
+      <ResponsiveContainer width="100%" height="100%" minWidth={300} minHeight={200}>
         <PieChart>
           <Pie 
             data={leadStatusData} 
@@ -148,7 +148,7 @@ const AttendanceChart = () => (
   <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100 h-full">
     <h3 className="font-semibold text-slate-800 mb-6">Weekly Attendance</h3>
     <div className="h-72 w-full">
-      <ResponsiveContainer width="100%" height="100%">
+      <ResponsiveContainer width="100%" height="100%" minWidth={300} minHeight={200}>
         <BarChart data={attendanceData} barSize={20}>
           <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
           <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fill: '#64748b', fontSize: 12}} />
@@ -403,7 +403,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user }) => {
             <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100 h-full">
                 <h3 className="font-semibold text-slate-800 mb-4">My Performance</h3>
                 <div className="h-64 w-full">
-                <ResponsiveContainer width="100%" height="100%">
+                <ResponsiveContainer width="100%" height="100%" minWidth={200} minHeight={150}>
                     <BarChart data={[{name: 'Visits', value: stats.visitsTotal}, {name: 'Orders', value: stats.orders}]}>
                         <CartesianGrid strokeDasharray="3 3" vertical={false} />
                         <XAxis dataKey="name" fontSize={12} />

@@ -82,16 +82,16 @@ const Attendance: React.FC<AttendanceProps> = ({ user }) => {
         setError(null);
       },
       (err) => {
-        console.error(err);
+        console.warn('GPS Error:', err);
         let msg = 'Unable to retrieve location.';
         if (err.code === 1) msg = 'Location access denied. Please enable location permissions.';
         else if (err.code === 2) msg = 'GPS signal unavailable.';
-        else if (err.code === 3) msg = 'Location request timed out.';
+        else if (err.code === 3) msg = 'Location request timed out. Retrying...';
         
         setError(msg);
         setLoadingAction(false);
       },
-      { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
+      { enableHighAccuracy: false, timeout: 30000, maximumAge: 300000 }
     );
   };
 

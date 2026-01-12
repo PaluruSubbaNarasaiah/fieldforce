@@ -11,7 +11,7 @@ const MOCK_USERS: User[] = [
   { 
     id: '1', 
     name: 'Alex Admin', 
-    email: 'admin@fieldforce.com', 
+    email: 'admin@bdts.com', 
     role: UserRole.ADMIN, 
     avatar: 'https://ui-avatars.com/api/?name=Admin',
     password: 'password'
@@ -19,7 +19,7 @@ const MOCK_USERS: User[] = [
   { 
     id: '2', 
     name: 'Sarah HR', 
-    email: 'hr@fieldforce.com', 
+    email: 'hr@bdts.com', 
     role: UserRole.HR, 
     avatar: 'https://ui-avatars.com/api/?name=HR',
     password: 'password'
@@ -27,7 +27,7 @@ const MOCK_USERS: User[] = [
   { 
     id: '3', 
     name: 'Mike Field', 
-    email: 'employee@fieldforce.com', 
+    email: 'employee@bdts.com', 
     role: UserRole.EMPLOYEE, 
     avatar: 'https://ui-avatars.com/api/?name=Employee',
     password: 'password'
