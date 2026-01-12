@@ -1,11 +1,13 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { 
   Settings,
   LogOut,
-  MapPin
+  MapPin,
+  User as UserIcon
 } from 'lucide-react';
 import { User } from '../types';
 import { MENU_ITEMS } from '../constants';
+import ProfileUpload from './ProfileUpload';
 
 interface SidebarProps {
   activeTab: string;
@@ -14,9 +16,11 @@ interface SidebarProps {
   setIsMobileOpen: (isOpen: boolean) => void;
   user: User | null;
   onLogout: () => void;
+  onUserUpdate?: (updatedUser: User) => void;
 }
 
-const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, isMobileOpen, setIsMobileOpen, user, onLogout }) => {
+const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, isMobileOpen, setIsMobileOpen, user, onLogout, onUserUpdate }) => {
+  const [showProfileUpload, setShowProfileUpload] = useState(false);
   
   const filteredItems = MENU_ITEMS.filter(item => 
     user ? item.roles.includes(user.role) : false
@@ -78,13 +82,45 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, isMobileOpen
           </div>
 
           <div className="p-4 border-t border-slate-700">
+            {/* Profile Upload Modal */}
+            {showProfileUpload && user && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+                <div className="bg-white rounded-xl p-6 max-w-sm w-full mx-4">
+                  <h3 className="text-lg font-semibold text-slate-900 mb-4 text-center">Update Profile Photo</h3>
+                  <ProfileUpload 
+                    user={user} 
+                    onProfileUpdate={(newAvatar) => {
+                      if (onUserUpdate) {
+                        onUserUpdate({ ...user, avatar: newAvatar });
+                      }
+                      setShowProfileUpload(false);
+                    }}
+                  />
+                  <button 
+                    onClick={() => setShowProfileUpload(false)}
+                    className="mt-4 w-full px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg transition-colors"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            )}
+            
             {/* User Profile Section */}
             <div className="flex items-center gap-3 px-4 mb-4">
-              <img 
-                src={user?.avatar || "https://picsum.photos/40/40"} 
-                alt="User" 
-                className="w-8 h-8 rounded-full border border-slate-600"
-              />
+              <button 
+                onClick={() => setShowProfileUpload(true)}
+                className="relative group"
+              >
+                <img 
+                  src={user?.avatar || "https://ui-avatars.com/api/?name=User&background=64748b&color=ffffff"} 
+                  alt="User" 
+                  className="w-8 h-8 rounded-full border border-slate-600 group-hover:opacity-80 transition-opacity"
+                />
+                <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                  <UserIcon className="w-4 h-4 text-white" />
+                </div>
+              </button>
               <div className="text-sm overflow-hidden">
                 <p className="text-white font-medium truncate">{user?.name || 'User'}</p>
                 <p className="text-slate-500 text-xs truncate">{user?.role || 'Guest'}</p>

@@ -27,6 +27,16 @@ const Attendance: React.FC<AttendanceProps> = ({ user }) => {
   useEffect(() => {
     getCurrentLocation();
     loadHistory();
+    
+    // Listen for storage changes to sync status across components
+    const handleStorageChange = () => {
+      loadHistory();
+    };
+    window.addEventListener('storage', handleStorageChange);
+    
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+    };
   }, [user]);
 
   const loadHistory = async () => {
@@ -43,8 +53,6 @@ const Attendance: React.FC<AttendanceProps> = ({ user }) => {
         
         // Find the LATEST record for today
         const activeSession = userHistory.find((item: any) => {
-            // Check if record date matches today's local date
-            // We support both exact string match or ISO string inclusion just in case legacy data exists
             const isToday = item.date === todayStr || (item.date && item.date.startsWith(todayStr));
             return isToday && item.inTime && (!item.outTime || item.outTime === '');
         });
@@ -52,16 +60,41 @@ const Attendance: React.FC<AttendanceProps> = ({ user }) => {
         if (activeSession) {
             setStatus('Checked In');
             setCurrentSessionId(activeSession.id);
+            // Update localStorage to match API data
+            localStorage.setItem('attendanceStatus', JSON.stringify({
+              status: 'Checked In',
+              sessionId: activeSession.id,
+              userId: user.id,
+              timestamp: Date.now()
+            }));
         } else {
             setStatus('Checked Out');
             setCurrentSessionId(null);
+            // Update localStorage to match API data
+            localStorage.setItem('attendanceStatus', JSON.stringify({
+              status: 'Checked Out',
+              sessionId: null,
+              userId: user.id,
+              timestamp: Date.now()
+            }));
         }
 
         setHistory(userHistory); 
     } catch (e) {
         console.error("Failed to load history", e);
         setError("Could not sync attendance status.");
-        setStatus('Checked Out'); 
+        
+        // Check localStorage as fallback
+        const storedStatus = localStorage.getItem('attendanceStatus');
+        if (storedStatus) {
+          const parsed = JSON.parse(storedStatus);
+          if (parsed.userId === user.id) {
+            setStatus(parsed.status);
+            setCurrentSessionId(parsed.sessionId);
+          }
+        } else {
+          setStatus('Checked Out');
+        }
     }
   };
 
@@ -98,12 +131,16 @@ const Attendance: React.FC<AttendanceProps> = ({ user }) => {
   const handleToggle = async () => {
     if (!location) {
       getCurrentLocation();
-      return; // Wait for location update
+      return;
     }
     
     setLoadingAction(true);
     const now = new Date();
-    const timeString = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    const timeString = now.toLocaleTimeString('en-US', { 
+      hour12: false, 
+      hour: '2-digit', 
+      minute: '2-digit' 
+    });
     const dateString = getTodayDateString();
     
     try {
@@ -117,16 +154,34 @@ const Attendance: React.FC<AttendanceProps> = ({ user }) => {
                 inTime: timeString,
                 outTime: '',
                 location: `${location.lat.toFixed(6)}, ${location.lng.toFixed(6)}`,
-                status: 'Present'
+                status: 'Present',
+                totalHours: ''
             };
             
             // Optimistic Update
             setStatus('Checked In'); 
             setCurrentSessionId(newId);
             setHistory(prev => [newSession, ...prev]);
+            
+            // Store status in localStorage for persistence
+            localStorage.setItem('attendanceStatus', JSON.stringify({
+              status: 'Checked In',
+              sessionId: newId,
+              userId: user.id,
+              timestamp: Date.now()
+            }));
 
             // API Call
-            await api.create('Attendance', newSession);
+            const result = await api.create('Attendance', newSession);
+            console.log('Punch In Result:', result);
+            
+            if (result.status !== 'success') {
+              // Revert optimistic update on failure
+              setStatus('Checked Out');
+              setCurrentSessionId(null);
+              setHistory(prev => prev.filter(h => h.id !== newId));
+              setError('Failed to punch in. Please try again.');
+            }
             
         } else {
             // --- PUNCH OUT ---
@@ -139,27 +194,50 @@ const Attendance: React.FC<AttendanceProps> = ({ user }) => {
             }
 
             if (targetId) {
+                const updatePayload = {
+                    id: targetId,
+                    outTime: timeString
+                };
+                
                 // Optimistic Update
                 setStatus('Checked Out');
                 setHistory(prev => prev.map(h => 
                     h.id === targetId ? { ...h, outTime: timeString } : h
                 ));
                 setCurrentSessionId(null);
+                
+                // Update localStorage
+                localStorage.setItem('attendanceStatus', JSON.stringify({
+                  status: 'Checked Out',
+                  sessionId: null,
+                  userId: user.id,
+                  timestamp: Date.now()
+                }));
 
                 // API Call
-                await api.update('Attendance', {
-                    id: targetId,
-                    outTime: timeString
-                });
+                const result = await api.update('Attendance', updatePayload);
+                console.log('Punch Out Result:', result);
+                
+                if (result.status !== 'success') {
+                  // Revert optimistic update on failure
+                  setStatus('Checked In');
+                  setCurrentSessionId(targetId);
+                  setHistory(prev => prev.map(h => 
+                      h.id === targetId ? { ...h, outTime: '' } : h
+                  ));
+                  setError('Failed to punch out. Please try again.');
+                } else {
+                  // Reload history to get updated total hours only on success
+                  setTimeout(() => loadHistory(), 1000);
+                }
             } else {
                  setError("Active session not found. Please refresh.");
                  await loadHistory();
             }
         }
     } catch (err) {
-        console.error(err);
+        console.error('Attendance Error:', err);
         setError("Network error. Changes saved locally but sync failed.");
-        // We keep the optimistic state to prevent jarring UX
     } finally {
         setLoadingAction(false);
     }
@@ -283,18 +361,20 @@ const Attendance: React.FC<AttendanceProps> = ({ user }) => {
                 <th className="px-6 py-3">Date</th>
                 <th className="px-6 py-3">In</th>
                 <th className="px-6 py-3">Out</th>
+                <th className="px-6 py-3">Hours</th>
                 <th className="px-6 py-3">Location</th>
                 <th className="px-6 py-3">Status</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {history.length === 0 ? (
-                  <tr><td colSpan={5} className="text-center py-4">No history found.</td></tr>
+                  <tr><td colSpan={6} className="text-center py-4">No history found.</td></tr>
               ) : history.slice(0, 10).map((record, idx) => (
                 <tr key={record.id || idx} className="hover:bg-slate-50 transition-colors">
                   <td className="px-6 py-4 font-medium text-slate-900">{record.date}</td>
                   <td className="px-6 py-4 text-green-600 font-medium">{record.inTime}</td>
                   <td className="px-6 py-4 text-red-600 font-medium">{record.outTime || '--:--'}</td>
+                  <td className="px-6 py-4 text-blue-600 font-medium">{record.totalHours || (record.outTime ? 'Calculating...' : '--')}</td>
                   <td className="px-6 py-4 flex items-center gap-1 font-mono text-xs truncate max-w-[150px]" title={record.location}>
                     <MapPin className="w-3 h-3 text-slate-400" /> {record.location}
                   </td>

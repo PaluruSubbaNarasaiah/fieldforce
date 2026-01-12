@@ -133,7 +133,6 @@ export const api = {
   uploadPhoto: async (imageData: string, metadata: any) => {
       if (GOOGLE_SCRIPT_URL.includes('INSERT_YOUR_DEPLOYED') || isMockMode) {
           console.log(`API (Mock): Uploaded Photo`, metadata);
-          // Return a mock success response
           return { status: 'success' };
       }
 
@@ -143,13 +142,39 @@ export const api = {
           headers: { 'Content-Type': 'text/plain;charset=utf-8' },
           body: JSON.stringify({ 
               action: 'uploadPhoto', 
-              sheet: 'Photos', // Context for backend, though handled by function
+              sheet: 'Photos',
               payload: { imageData, metadata } 
           })
         });
         return await response.json();
       } catch (error) {
         console.error(`Error uploading photo:`, error);
+        return { status: 'error', message: 'Network Error' };
+      }
+  },
+
+  /**
+   * Upload Profile Image to Drive
+   */
+  uploadProfile: async (imageData: string, userId: string, userName: string) => {
+      if (GOOGLE_SCRIPT_URL.includes('INSERT_YOUR_DEPLOYED') || isMockMode) {
+          console.log(`API (Mock): Uploaded Profile`, { userId, userName });
+          return { status: 'success', data: { avatar: 'https://ui-avatars.com/api/?name=' + userName } };
+      }
+
+      try {
+        const response = await fetch(GOOGLE_SCRIPT_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+          body: JSON.stringify({ 
+              action: 'uploadProfile', 
+              sheet: 'Users',
+              payload: { imageData, userId, userName } 
+          })
+        });
+        return await response.json();
+      } catch (error) {
+        console.error(`Error uploading profile:`, error);
         return { status: 'error', message: 'Network Error' };
       }
   }

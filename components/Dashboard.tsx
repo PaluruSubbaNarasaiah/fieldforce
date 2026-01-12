@@ -281,6 +281,9 @@ const Dashboard: React.FC<DashboardProps> = ({ user }) => {
 
         // Process based on Role
         if (user.role === UserRole.ADMIN) {
+            // Get online users count
+            const onlineUsers = usersData.filter((u: any) => u.isonline === 'true' || u.isonline === true).length;
+            
             setStats({
                 visits: visitsData.filter((v: any) => v.status === 'Scheduled').length,
                 visitsTotal: visitsData.length,
@@ -289,12 +292,15 @@ const Dashboard: React.FC<DashboardProps> = ({ user }) => {
                 orders: ordersData.length,
                 expenses: expensesData.filter((e: any) => e.status === 'Pending').length,
                 staff: usersData.length,
-                attendance: attendanceData.filter((a: any) => a.date === today && a.inTime).length
+                attendance: onlineUsers
             });
             // Admin sees all visits for today
             setTodaysVisits(visitsData.filter((v: any) => v.date && v.date.includes(today)).slice(0, 5));
         } 
         else if (user.role === UserRole.HR) {
+            const onlineUsers = usersData.filter((u: any) => u.isonline === 'true' || u.isonline === true).length;
+            const todayAttendance = attendanceData.filter((a: any) => a.date === today && a.inTime).length;
+            
             setStats({
                 visits: 0,
                 visitsTotal: 0,
@@ -303,7 +309,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user }) => {
                 orders: 0,
                 expenses: expensesData.filter((e: any) => e.status === 'Pending').length,
                 staff: usersData.length,
-                attendance: attendanceData.filter((a: any) => a.date === today && a.inTime).length
+                attendance: todayAttendance
             });
         }
         else {
@@ -319,6 +325,16 @@ const Dashboard: React.FC<DashboardProps> = ({ user }) => {
                 (a.date === today || a.date?.startsWith(today)) && 
                 a.inTime
             );
+            
+            // Also check localStorage for real-time status
+            const storedStatus = localStorage.getItem('attendanceStatus');
+            let attendanceStatus = isPresent ? 1 : 0;
+            if (storedStatus) {
+              const parsed = JSON.parse(storedStatus);
+              if (parsed.userId === user.id && parsed.status === 'Checked In') {
+                attendanceStatus = 1;
+              }
+            }
 
             setStats({
                 visits: myVisits.filter((v: any) => v.status === 'Scheduled').length,
@@ -328,7 +344,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user }) => {
                 orders: myOrders.length,
                 expenses: myExpenses.length,
                 staff: 0,
-                attendance: isPresent ? 1 : 0
+                attendance: attendanceStatus
             });
             
             setTodaysVisits(myVisits.filter((v: any) => v.date && v.date.includes(today)).slice(0, 5));
@@ -371,7 +387,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user }) => {
         { label: 'Total Revenue', value: `₹${(stats.orders * 15000).toLocaleString()}`, icon: IndianRupee, color: 'text-green-600', bg: 'bg-green-50', subtext: 'Est. from Orders' },
         { label: 'Active Leads', value: stats.leads, icon: TrendingUp, color: 'text-purple-600', bg: 'bg-purple-50', subtext: 'In Pipeline' },
         { label: 'Pending Expenses', value: stats.expenses, icon: FileText, color: 'text-orange-600', bg: 'bg-orange-50', subtext: 'Requires Approval' },
-        { label: 'Total Staff', value: stats.staff, icon: Users, color: 'text-blue-600', bg: 'bg-blue-50', subtext: `${stats.attendance} Present Today` }
+        { label: 'Online Staff', value: `${stats.attendance}/${stats.staff}`, icon: Users, color: 'text-blue-600', bg: 'bg-blue-50', subtext: 'Currently Active' }
       );
       mainWidgets.push(
         { component: RevenueChart, colSpan: 'col-span-1' },
@@ -379,7 +395,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user }) => {
       );
     } else if (role === UserRole.HR) {
       statsWidgets.push(
-        { label: 'Present Today', value: `${stats.attendance}/${stats.staff}`, icon: CheckCircle, color: 'text-green-600', bg: 'bg-green-50', subtext: 'Attendance Rate' },
+        { label: 'Online Now', value: `${stats.attendance}/${stats.staff}`, icon: CheckCircle, color: 'text-green-600', bg: 'bg-green-50', subtext: 'Active Staff' },
         { label: 'On Leave', value: Math.max(0, stats.staff - stats.attendance - 2), icon: AlertTriangle, color: 'text-orange-600', bg: 'bg-orange-50', subtext: 'Planned Leaves' },
         { label: 'Pending Onboarding', value: '3', icon: UserPlus, color: 'text-blue-600', bg: 'bg-blue-50', subtext: 'New Joinees' },
         { label: 'Expense Requests', value: stats.expenses, icon: IndianRupee, color: 'text-purple-600', bg: 'bg-purple-50', subtext: 'To Process' }

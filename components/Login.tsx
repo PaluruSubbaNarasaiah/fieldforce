@@ -41,13 +41,12 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [isDemoMode, setIsDemoMode] = useState(false);
 
-  // Helper to ensure role matches Enum values even if data source varies in casing
   const normalizeRole = (role: string): UserRole => {
     const r = role?.toLowerCase()?.trim();
-    if (r === 'admin') return UserRole.ADMIN; // 'Admin'
-    if (r === 'hr') return UserRole.HR;       // 'HR'
-    if (r === 'employee') return UserRole.EMPLOYEE; // 'Employee'
-    return UserRole.EMPLOYEE; // Default fallback
+    if (r === 'admin') return UserRole.ADMIN;
+    if (r === 'hr') return UserRole.HR;
+    if (r === 'employee') return UserRole.EMPLOYEE;
+    return UserRole.EMPLOYEE;
   };
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -56,10 +55,8 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
     setIsLoading(true);
 
     try {
-        // Fetch users from API (Google Sheet)
         let users = await api.fetch('Users');
         
-        // If API returns empty (likely connection error caught in api.ts), use mock
         if (!users || users.length === 0) {
             console.log('Using Mock Users due to API failure or empty list');
             users = MOCK_USERS;
@@ -71,17 +68,14 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
         const user = users.find((u: User) => u.email.toLowerCase() === email.toLowerCase());
       
         if (user) {
-            // Normalize the role from the data source
             const normalizedRole = normalizeRole(user.role);
 
-            // Check password logic:
             const isPasswordValid = 
                 (user.password && String(user.password) === password) || 
-                password === 'password' || // Universal fallback for ease
+                password === 'password' || 
                 (normalizedRole === UserRole.ADMIN && password === 'admin123');
 
             if (isPasswordValid) {
-                // Pass the user with the strictly normalized role
                 onLogin({ ...user, role: normalizedRole });
             } else {
                 setError('Invalid credentials. Please try again.');
@@ -98,83 +92,87 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden" style={{
-      backgroundImage: 'url(/landing.png)',
-      backgroundSize: 'cover',
-      backgroundPosition: 'center',
-      backgroundRepeat: 'no-repeat'
-    }}>
-      {/* Background overlay */}
-      <div className="absolute inset-0 bg-black/30 backdrop-blur-sm"></div>
-
-      <div className="max-w-md w-full bg-white/10 backdrop-blur-md border border-white/20 rounded-2xl shadow-2xl overflow-hidden z-10">
-        <div className="bg-white/10 backdrop-blur-md border-b border-white/20 p-8 text-center text-white relative">
-          <div className="w-16 h-16 bg-white/20 rounded-2xl flex items-center justify-center mx-auto mb-4 backdrop-blur-sm">
-            <img src="/Bdts.png" alt="BDTS Logo" className="w-12 h-12 object-contain" />
+    <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden bg-gradient-to-br from-pink-400 via-purple-500 to-blue-600">
+      <div className="max-w-sm w-full space-y-8">
+        {/* Avatar Circle */}
+        <div className="flex justify-center mb-12">
+          <div className="relative">
+            <div className="w-24 h-24 border-2 border-white/30 rounded-full flex items-center justify-center">
+              <div className="w-16 h-16 border border-white/50 rounded-full flex items-center justify-center">
+                <img src="/BDTSlogo.png" alt="BDTS Logo" className="w-12 h-12 object-cover rounded-full" />
+              </div>
+            </div>
+            <div className="absolute top-1/2 -left-20 w-16 h-px bg-white/30"></div>
+            <div className="absolute top-1/2 -right-20 w-16 h-px bg-white/30"></div>
           </div>
-          <h1 className="text-3xl font-bold mb-2 drop-shadow-lg">BDTS Field Force Pro</h1>
-          <p className="text-white/80 drop-shadow-md">Manage your workforce efficiently</p>
         </div>
 
-        <div className="p-8 bg-white/5 backdrop-blur-sm">
-          <form onSubmit={handleLogin} className="space-y-6">
-            <div>
-              <label className="block text-sm font-medium text-white/90 mb-2">Email Address</label>
-              <div className="relative">
-                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 text-white/60 w-5 h-5" />
-                <input
-                  type="email"
-                  required
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="w-full pl-10 pr-4 py-3 bg-white/10 backdrop-blur-sm border border-white/20 rounded-lg focus:outline-none focus:ring-2 focus:ring-white/30 focus:border-white/40 transition-all text-white placeholder-white/60"
-                  placeholder="Enter your email"
-                />
-              </div>
+        {/* Login Form */}
+        <form onSubmit={handleLogin} className="space-y-4">
+          {/* Username Field */}
+          <div className="flex">
+            <div className="w-12 h-12 bg-white/10 border border-white/20 rounded-l-lg flex items-center justify-center">
+              <svg className="w-5 h-5 text-white/70" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" />
+              </svg>
             </div>
+            <input
+              type="email"
+              required
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              className="flex-1 h-12 bg-white/20 border border-white/20 border-l-0 rounded-r-lg px-4 text-white placeholder-white/50 focus:outline-none focus:bg-white/30"
+              placeholder="USERNAME"
+            />
+          </div>
 
-            <div>
-              <label className="block text-sm font-medium text-white/90 mb-2">Password</label>
-              <div className="relative">
-                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-white/60 w-5 h-5" />
-                <input
-                  type="password"
-                  required
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="w-full pl-10 pr-4 py-3 bg-white/10 backdrop-blur-sm border border-white/20 rounded-lg focus:outline-none focus:ring-2 focus:ring-white/30 focus:border-white/40 transition-all text-white placeholder-white/60"
-                  placeholder="••••••••"
-                />
-              </div>
+          {/* Password Field */}
+          <div className="flex">
+            <div className="w-12 h-12 bg-white/10 border border-white/20 rounded-l-lg flex items-center justify-center">
+              <svg className="w-5 h-5 text-white/70" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd" />
+              </svg>
             </div>
+            <input
+              type="password"
+              required
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              className="flex-1 h-12 bg-white/20 border border-white/20 border-l-0 rounded-r-lg px-4 text-white placeholder-white/50 focus:outline-none focus:bg-white/30"
+              placeholder="••••••••"
+            />
+          </div>
 
-            {error && (
-              <div className="bg-red-50 text-red-600 text-sm p-3 rounded-lg flex items-center gap-2 animate-fade-in">
-                <AlertCircle className="w-4 h-4 shrink-0" />
-                {error}
-              </div>
+          {/* Login Button */}
+          <button
+            type="submit"
+            disabled={isLoading}
+            className="w-full h-12 bg-pink-500 hover:bg-pink-600 text-white font-semibold rounded-lg transition-colors disabled:opacity-70 flex items-center justify-center"
+          >
+            {isLoading ? (
+              <>
+                <Loader2 className="w-5 h-5 animate-spin mr-2" />
+                SIGNING IN...
+              </>
+            ) : (
+              'LOGIN'
             )}
-            
-            {isDemoMode && (
-              <div className="bg-yellow-50 text-yellow-700 text-xs p-3 rounded-lg flex items-center gap-2 animate-fade-in border border-yellow-100">
-                <WifiOff className="w-4 h-4 shrink-0" />
-                Running in Demo Mode. Connect your Google Sheet to save data permanently.
-              </div>
-            )}
+          </button>
+        </form>
 
-            <button
-              type="submit"
-              disabled={isLoading}
-              className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-semibold py-3 rounded-lg shadow-lg shadow-blue-500/30 flex items-center justify-center gap-2 transition-all transform hover:scale-[1.02] disabled:opacity-70 disabled:cursor-not-allowed"
-            >
-              {isLoading ? (
-                <> <Loader2 className="w-5 h-5 animate-spin" /> Signing In...</>
-              ) : (
-                <>Sign In <ChevronRight className="w-4 h-4" /></>
-              )}
-            </button>
-          </form>
-        </div>
+        {/* Error Message */}
+        {error && (
+          <div className="text-red-300 text-sm text-center">
+            {error}
+          </div>
+        )}
+
+        {/* Demo Mode */}
+        {isDemoMode && (
+          <div className="text-yellow-300 text-xs text-center">
+            Demo Mode Active
+          </div>
+        )}
       </div>
     </div>
   );

@@ -25,12 +25,16 @@ const App: React.FC = () => {
 
   const handleLogin = (loggedInUser: User) => {
     setUser(loggedInUser);
-    setActiveTab('dashboard'); // Reset to dashboard on login
+    setActiveTab('dashboard');
   };
 
   const handleLogout = () => {
     setUser(null);
     setActiveTab('dashboard');
+  };
+
+  const handleUserUpdate = (updatedUser: User) => {
+    setUser(updatedUser);
   };
 
   // If not logged in, show login screen
@@ -95,6 +99,7 @@ const App: React.FC = () => {
         setIsMobileOpen={setIsMobileOpen}
         user={user}
         onLogout={handleLogout}
+        onUserUpdate={handleUserUpdate}
       />
 
       <div className="flex-1 flex flex-col h-full overflow-hidden">
