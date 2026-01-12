@@ -98,49 +98,51 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
   };
 
   return (
-    <div className="min-h-screen bg-slate-900 flex items-center justify-center p-4 relative overflow-hidden">
-      {/* Background decoration */}
-      <div className="absolute top-0 left-0 w-full h-full overflow-hidden pointer-events-none">
-        <div className="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] bg-blue-600/20 rounded-full blur-[100px]"></div>
-        <div className="absolute bottom-[-10%] right-[-10%] w-[50%] h-[50%] bg-indigo-600/20 rounded-full blur-[100px]"></div>
-      </div>
+    <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden" style={{
+      backgroundImage: 'url(/landing.png)',
+      backgroundSize: 'cover',
+      backgroundPosition: 'center',
+      backgroundRepeat: 'no-repeat'
+    }}>
+      {/* Background overlay */}
+      <div className="absolute inset-0 bg-black/30 backdrop-blur-sm"></div>
 
-      <div className="max-w-md w-full bg-white rounded-2xl shadow-2xl overflow-hidden z-10">
-        <div className="bg-gradient-to-r from-blue-600 to-indigo-700 p-8 text-center text-white relative">
+      <div className="max-w-md w-full bg-white/10 backdrop-blur-md border border-white/20 rounded-2xl shadow-2xl overflow-hidden z-10">
+        <div className="bg-white/10 backdrop-blur-md border-b border-white/20 p-8 text-center text-white relative">
           <div className="w-16 h-16 bg-white/20 rounded-2xl flex items-center justify-center mx-auto mb-4 backdrop-blur-sm">
             <img src="/Bdts.png" alt="BDTS Logo" className="w-12 h-12 object-contain" />
           </div>
-          <h1 className="text-3xl font-bold mb-2">BDTS Field Force Pro</h1>
-          <p className="text-blue-100">Manage your workforce efficiently</p>
+          <h1 className="text-3xl font-bold mb-2 drop-shadow-lg">BDTS Field Force Pro</h1>
+          <p className="text-white/80 drop-shadow-md">Manage your workforce efficiently</p>
         </div>
 
-        <div className="p-8">
+        <div className="p-8 bg-white/5 backdrop-blur-sm">
           <form onSubmit={handleLogin} className="space-y-6">
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-2">Email Address</label>
+              <label className="block text-sm font-medium text-white/90 mb-2">Email Address</label>
               <div className="relative">
-                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-5 h-5" />
+                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 text-white/60 w-5 h-5" />
                 <input
                   type="email"
                   required
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="w-full pl-10 pr-4 py-3 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-slate-900"
+                  className="w-full pl-10 pr-4 py-3 bg-white/10 backdrop-blur-sm border border-white/20 rounded-lg focus:outline-none focus:ring-2 focus:ring-white/30 focus:border-white/40 transition-all text-white placeholder-white/60"
                   placeholder="Enter your email"
                 />
               </div>
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-2">Password</label>
+              <label className="block text-sm font-medium text-white/90 mb-2">Password</label>
               <div className="relative">
-                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-5 h-5" />
+                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-white/60 w-5 h-5" />
                 <input
                   type="password"
                   required
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="w-full pl-10 pr-4 py-3 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-slate-900"
+                  className="w-full pl-10 pr-4 py-3 bg-white/10 backdrop-blur-sm border border-white/20 rounded-lg focus:outline-none focus:ring-2 focus:ring-white/30 focus:border-white/40 transition-all text-white placeholder-white/60"
                   placeholder="••••••••"
                 />
               </div>
